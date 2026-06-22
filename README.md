@@ -1,5 +1,4 @@
-# DC-2
-Walkthrough of the DC-2 vulnerable machine using Nmap, WPScan, Cewl + WPScan brute-force, ssh and Privesc.
+
 # DC-2 — VulnHub CTF Write-up
 
 **Machine:** DC-2  
@@ -32,7 +31,7 @@ sudo nmap -A 192.168.56.105
 
 **Screenshot:**
 
-![Nmap + WPScan start](screenshots/01_nmap_wpscan_start.png)
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_15_05_46" src="https://github.com/user-attachments/assets/9d1df14f-eb1e-478e-892b-2540b1e97493" />
 
 **What happened:**  
 Nmap revealed only one open port — **port 80 running Apache 2.4.10 on Debian**.  
@@ -51,8 +50,7 @@ wpscan --url http://dc-2/ --enumerate u
 ```
 
 **Screenshot:**
-
-![WPScan users found](screenshots/02_wpscan_users.png)
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_15_06_17" src="https://github.com/user-attachments/assets/f99c786a-d587-4f7a-abc3-6694b9735d61" />
 
 **What happened:**  
 WPScan found **3 valid WordPress users**:
@@ -75,8 +73,7 @@ wpscan --url http://dc-2/ -U tom,jerry -P /tmp/dc2_wordlist.txt
 
 **Screenshot:**
 
-![WPScan credentials found](screenshots/03_wpscan_credentials.png)
-
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_15_06_52" src="https://github.com/user-attachments/assets/606be07a-c041-4e11-9f59-5adfde6547ae" />
 **What happened:**  
 CeWL crawled the WordPress site and built a custom wordlist from words found on the pages.  
 WPScan then used that wordlist to brute-force the login via XML-RPC.
@@ -93,9 +90,7 @@ Website owners often use words related to their content as passwords. CeWL explo
 ## Step 4 — Flag 2 (WordPress Dashboard)
 
 **Screenshot:**
-
-![Flag 2 in WordPress](screenshots/04_flag2_wordpress.png)
-
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_15_13_53" src="https://github.com/user-attachments/assets/65e68e17-a373-421a-83bb-f11ab9aaf22a" />
 **What happened:**  
 Logged into WordPress as `tom` and found **Flag 2** hidden in a private page at `/index.php/flag-2/`.
 
@@ -123,7 +118,7 @@ vi
 
 **Screenshot:**
 
-![SSH tom + flag3](screenshots/05_ssh_tom_flag3.png)
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_16_31_13" src="https://github.com/user-attachments/assets/d4b28973-2cd0-481c-9493-1c3573bf4c62" />
 
 **What happened:**  
 SSH was running on **port 7744** (not the default 22 — always scan all ports).  
@@ -151,7 +146,7 @@ cd ~
 
 **Screenshot:**
 
-![su jerry + flag4](screenshots/06_jerry_flag4.png)
+<img width="1920" height="1080" alt="VirtualBox_kali_19_06_2026_16_41_47" src="https://github.com/user-attachments/assets/54aca352-558e-4c12-83a4-693cd5c523e8" />
 
 **What happened:**  
 Switched from `tom` to `jerry` using the password found in Step 3.  
@@ -178,12 +173,10 @@ Inside the pager (`less`):
 ```
 
 **Screenshots:**
+<img width="1920" height="1080" alt="VirtualBox_kali_22_06_2026_09_12_35" src="https://github.com/user-attachments/assets/91507755-31cc-4fc1-8355-b799dfc169ea" />
+<img width="1920" height="1080" alt="VirtualBox_kali_22_06_2026_09_12_21" src="https://github.com/user-attachments/assets/6fbdafab-69fe-420f-ad47-3b37600049d7" />
+<img width="1920" height="1080" alt="VirtualBox_kali_22_06_2026_09_12_01" src="https://github.com/user-attachments/assets/1bf070e5-884d-451d-a6a3-e0fdf31d4141" />
 
-![sudo -l and git privesc](screenshots/07_sudo_git_privesc.png)
-
-![Inside less pager](screenshots/08_less_pager.png)
-
-![!/bin/bash typed](screenshots/09_shell_escape.png)
 
 **What happened:**  
 `sudo -l` showed that jerry could run `/usr/bin/git` as root with **no password required**:
@@ -211,7 +204,7 @@ cat /root/final-flag.txt
 
 **Screenshot:**
 
-![Root and final flag](screenshots/10_root_final_flag.png)
+<img width="1920" height="1080" alt="VirtualBox_kali_22_06_2026_09_19_19" src="https://github.com/user-attachments/assets/55363c29-ba8a-41d9-8005-6b3d996c32b0" />
 
 **What happened:**  
 Full root access confirmed. The final flag was in `/root/final-flag.txt`.
