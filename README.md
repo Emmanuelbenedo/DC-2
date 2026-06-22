@@ -1,2 +1,256 @@
 # DC-2
 Walkthrough of the DC-2 vulnerable machine using Nmap, WPScan, Cewl + WPScan brute-force, ssh and Privesc.
+# DC-2 — VulnHub CTF Write-up
+
+**Machine:** DC-2  
+**Platform:** VulnHub  
+**Difficulty:** Beginner/Intermediate  
+**Goal:** Get root and read the final flag  
+**Attack machine:** Kali Linux (`192.168.56.108`)  
+**Target machine:** DC-2 (`192.168.56.105`)  
+**Network:** VirtualBox Host-Only
+
+---
+
+## Tools Used
+
+| Tool | Purpose |
+|------|---------|
+| `nmap` | Port scanning and service detection |
+| `wpscan` | WordPress enumeration and brute-force |
+| `cewl` | Custom wordlist generation |
+| `ssh` | Remote access to the target |
+| `vi` | Escape restricted shell (rbash) |
+| `sudo git` | Privilege escalation to root |
+
+## Step 1 — Reconnaissance
+
+**Command:**
+```bash
+sudo nmap -A 192.168.56.105
+```
+
+**Screenshot:**
+
+![Nmap + WPScan start](screenshots/01_nmap_wpscan_start.png)
+
+**What happened:**  
+Nmap revealed only one open port — **port 80 running Apache 2.4.10 on Debian**.  
+The HTTP title said "DC-2 — Just another WordPress site", which immediately told us the target runs **WordPress 4.7.10**.
+
+**Why it matters:**  
+Knowing the service and version lets us choose the right tool. WordPress has its own dedicated scanner — WPScan — so that's the next step.
+
+---
+
+## Step 2 — WordPress User Enumeration
+
+**Command:**
+```bash
+wpscan --url http://dc-2/ --enumerate u
+```
+
+**Screenshot:**
+
+![WPScan users found](screenshots/02_wpscan_users.png)
+
+**What happened:**  
+WPScan found **3 valid WordPress users**:
+- `admin`
+- `jerry`
+- `tom`
+
+**Why it matters:**  
+WordPress usernames are the first half of the login puzzle. Now we need their passwords.
+
+---
+
+## Step 3 — Password Brute-Force
+
+**Commands:**
+```bash
+cewl http://dc-2/ -w /tmp/dc2_wordlist.txt
+wpscan --url http://dc-2/ -U tom,jerry -P /tmp/dc2_wordlist.txt
+```
+
+**Screenshot:**
+
+![WPScan credentials found](screenshots/03_wpscan_credentials.png)
+
+**What happened:**  
+CeWL crawled the WordPress site and built a custom wordlist from words found on the pages.  
+WPScan then used that wordlist to brute-force the login via XML-RPC.
+
+**Credentials found:**
+- `tom` / `parturient`
+- `jerry` / `adipiscing`
+
+**Why it matters:**  
+Website owners often use words related to their content as passwords. CeWL exploits this by generating a targeted wordlist instead of using a generic one like `rockyou.txt`. It's faster and more likely to succeed.
+
+---
+
+## Step 4 — Flag 2 (WordPress Dashboard)
+
+**Screenshot:**
+
+![Flag 2 in WordPress](screenshots/04_flag2_wordpress.png)
+
+**What happened:**  
+Logged into WordPress as `tom` and found **Flag 2** hidden in a private page at `/index.php/flag-2/`.
+
+**Flag 2 message:**
+> "If you can't exploit WordPress and take a shortcut, there is another way. Hope you found another entry point."
+
+**Why it matters:**  
+This was a hint pointing us toward SSH — the "other way in".
+
+---
+
+## Step 5 — SSH Access + rbash Escape + Flag 3
+
+**Commands:**
+```bash
+ssh tom@192.168.56.105 -p 7744
+```
+Once connected (restricted shell):
+```bash
+vi
+:set shell=/bin/bash
+:shell
+/bin/cat flag3.txt
+```
+
+**Screenshot:**
+
+![SSH tom + flag3](screenshots/05_ssh_tom_flag3.png)
+
+**What happened:**  
+SSH was running on **port 7744** (not the default 22 — always scan all ports).  
+After logging in as `tom`, we were dropped into **rbash** (restricted bash), which blocked many commands including `cat`, `su`, and paths with `/`.
+
+We escaped using `vi` — a text editor available even in rbash — by launching a full bash shell from inside it.
+
+**Flag 3 message:**
+> "Poor old Tom is always running after Jerry. Perhaps he should su for all the stress he causes."
+
+**Why it matters:**  
+rbash is a common restriction on CTF machines and real-world systems. `vi` is a classic escape because it can spawn a shell. This is documented on [GTFOBins](https://gtfobins.github.io/gtfobins/vi/).
+
+---
+
+## Step 6 — Switch to Jerry + Flag 4
+
+**Commands:**
+```bash
+/bin/su jerry
+# password: adipiscing
+cd ~
+/bin/cat flag4.txt
+```
+
+**Screenshot:**
+
+![su jerry + flag4](screenshots/06_jerry_flag4.png)
+
+**What happened:**  
+Switched from `tom` to `jerry` using the password found in Step 3.  
+Found **Flag 4** in jerry's home directory.
+
+**Flag 4 message:**
+> "Good to see that you've made it this far — but you're not home yet. You still need to get the final flag. No hints here — you're on your own now. Go on — git outta here!!!!"
+
+**Why it matters:**  
+The hint "git outta here" was a clear pointer toward `git` as the privesc vector.
+
+---
+
+## Step 7 — Privilege Escalation via sudo git
+
+**Commands:**
+```bash
+sudo -l
+sudo git -p help config
+```
+Inside the pager (`less`):
+```
+!/bin/bash
+```
+
+**Screenshots:**
+
+![sudo -l and git privesc](screenshots/07_sudo_git_privesc.png)
+
+![Inside less pager](screenshots/08_less_pager.png)
+
+![!/bin/bash typed](screenshots/09_shell_escape.png)
+
+**What happened:**  
+`sudo -l` showed that jerry could run `/usr/bin/git` as root with **no password required**:
+```
+(root) NOPASSWD: /usr/bin/git
+```
+
+`sudo git -p help config` opened the git manual in the `less` pager running as root.  
+From inside `less`, typing `!/bin/bash` spawned a **root shell**.
+
+**Why it matters:**  
+This is a well-known GTFOBins technique. When `sudo` allows a binary that can call system commands (like `less`, `vi`, `git`), it can be abused to escape into a root shell. The `-p` flag forces git to use a pager, which is the key to triggering this.
+
+Reference: [GTFOBins — git](https://gtfobins.github.io/gtfobins/git/)
+
+---
+
+## Step 8 — Root + Final Flag
+
+**Commands:**
+```bash
+ls -la /root/
+cat /root/final-flag.txt
+```
+
+**Screenshot:**
+
+![Root and final flag](screenshots/10_root_final_flag.png)
+
+**What happened:**  
+Full root access confirmed. The final flag was in `/root/final-flag.txt`.
+
+```
+Well done!!!
+Congratulations!!!
+```
+
+---
+
+## Flags Summary
+
+| Flag | Location | How |
+|------|----------|-----|
+| Flag 1 | WordPress page (source) | Browse the site |
+| Flag 2 | WordPress private page `/flag-2/` | Login as tom |
+| Flag 3 | `/home/tom/flag3.txt` | SSH + rbash escape |
+| Flag 4 | `/home/jerry/flag4.txt` | su jerry |
+| Final Flag | `/root/final-flag.txt` | sudo git privesc |
+
+---
+
+## Remediation
+
+What a real sysadmin should fix on this machine:
+
+- **Outdated WordPress (4.7.10)** — update to the latest version
+- **Weak passwords** — `parturient` and `adipiscing` are dictionary words; enforce strong password policy
+- **SSH on non-standard port** — security through obscurity, not a real fix; use key-based auth instead
+- **rbash as a security control** — trivially bypassable via `vi`; not a reliable restriction
+- **NOPASSWD sudo on git** — never give NOPASSWD sudo to binaries that can spawn shells
+- **XML-RPC enabled** — disable it if not needed; it allows brute-force without lockout
+
+---
+
+## References
+
+- [VulnHub — DC-2](https://www.vulnhub.com/entry/dc-2,311/)
+- [GTFOBins — git](https://gtfobins.github.io/gtfobins/git/)
+- [GTFOBins — vi](https://gtfobins.github.io/gtfobins/vi/)
+- [WPScan Documentation](https://github.com/wpscanteam/wpscan)
